@@ -7,6 +7,7 @@ const RecordingInterface: React.FC = () => {
     isRecording, 
     isProcessing, 
     currentDuration, 
+    processingStatus,
     startRecording, 
     stopRecording 
   } = useRecording();
@@ -42,11 +43,18 @@ const RecordingInterface: React.FC = () => {
             )}
             
             {isProcessing && (
-              <div className="flex items-center justify-center gap-3 mb-4">
-                <Loader2 className="w-6 h-6 text-primary animate-spin" />
-                <span className="text-xl font-medium text-gray-700 dark:text-gray-300">
-                  Verarbeitung läuft...
-                </span>
+              <div className="flex flex-col items-center justify-center gap-3 mb-4">
+                <div className="flex items-center gap-3">
+                  <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                  <span className="text-xl font-medium text-gray-700 dark:text-gray-300">
+                    Verarbeitung läuft...
+                  </span>
+                </div>
+                {processingStatus && (
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    {processingStatus}
+                  </span>
+                )}
               </div>
             )}
 
@@ -117,7 +125,8 @@ const RecordingInterface: React.FC = () => {
             <div className="mt-12 p-4 bg-blue-50 dark:bg-gray-700 rounded-lg">
               <p className="text-sm text-blue-800 dark:text-blue-200">
                 <strong>Tipp:</strong> Stellen Sie sicher, dass Ihr Mikrofon korrekt eingerichtet ist 
-                und Sie sich in einer ruhigen Umgebung befinden für beste Ergebnisse.
+                und Sie sich in einer ruhigen Umgebung befinden für beste Ergebnisse. 
+                {' '}Vergessen Sie nicht, Ihren Groq API-Schlüssel in den Einstellungen zu hinterlegen.
               </p>
             </div>
           )}

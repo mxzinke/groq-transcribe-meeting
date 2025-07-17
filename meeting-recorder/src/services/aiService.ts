@@ -10,31 +10,68 @@ interface TranscriptionResult {
   }>;
 }
 
+interface TranscriptionProgress {
+  status: 'processing' | 'completed' | 'error';
+  progress?: number;
+  message?: string;
+}
+
 class AIService {
-  private groq: any;
+  private groq: ReturnType<typeof createGroq>;
+  private apiKey: string;
 
   constructor(apiKey: string) {
+    this.apiKey = apiKey;
     this.groq = createGroq({
       apiKey: apiKey
     });
   }
 
-  async transcribeAudio(audioBlob: Blob): Promise<TranscriptionResult> {
+  async transcribeAudio(audioBlob: Blob, onProgress?: (progress: TranscriptionProgress) => void): Promise<TranscriptionResult> {
     try {
-      // Convert blob to base64
-      const base64Audio = await this.blobToBase64(audioBlob);
+      // Notify start of processing
+      onProgress?.({ status: 'processing', progress: 10, message: 'Audio wird vorbereitet...' });
+
+      // Convert blob to File object for Groq API
+      const audioFile = new File([audioBlob], 'recording.webm', { type: audioBlob.type });
       
-      // For now, we'll return a mock result since Groq's Whisper API
-      // might need specific formatting. In production, you'd use:
-      // const result = await this.groq.transcribe(...)
+      // Since the AI SDK doesn't directly support audio transcription,
+      // we'll use the native Groq API with fetch
+      onProgress?.({ status: 'processing', progress: 30, message: 'Audio wird an Groq gesendet...' });
+      
+      const formData = new FormData();
+      formData.append('file', audioFile);
+      formData.append('model', 'whisper-large-v3');
+      formData.append('language', 'de'); // German language
+      formData.append('response_format', 'json');
+
+      const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Groq API error: ${response.status} - ${error}`);
+      }
+
+      onProgress?.({ status: 'processing', progress: 80, message: 'Transkription wird verarbeitet...' });
+      
+      const result = await response.json();
+      
+      onProgress?.({ status: 'completed', progress: 100, message: 'Transkription abgeschlossen!' });
       
       return {
-        text: "Dies ist eine Beispiel-Transkription. Die tatsächliche Implementierung würde Groq's Whisper API verwenden.",
-        segments: []
+        text: result.text,
+        segments: result.segments || []
       };
     } catch (error) {
       console.error('Transcription failed:', error);
-      throw new Error('Transkription fehlgeschlagen');
+      onProgress?.({ status: 'error', message: 'Transkription fehlgeschlagen' });
+      throw new Error('Transkription fehlgeschlagen: ' + (error as Error).message);
     }
   }
 
@@ -51,25 +88,27 @@ Analysiere das folgende Meeting-Transkript und erstelle eine strukturierte Zusam
 - **Teilnehmer**: ${metadata.participants || 'Unbekannt'}
 
 ## Hauptthemen
-[Extrahiere die wichtigsten Diskussionspunkte]
+[Extrahiere die wichtigsten Diskussionspunkte aus dem Transkript. Liste sie als Bullet Points auf.]
 
 ## Entscheidungen
-[Liste alle getroffenen Entscheidungen auf]
+[Liste alle getroffenen Entscheidungen auf. Falls keine expliziten Entscheidungen getroffen wurden, schreibe "Keine expliziten Entscheidungen dokumentiert".]
 
 ## Action Items
-[Konkrete Aufgaben und Zuständigkeiten]
+[Konkrete Aufgaben und Zuständigkeiten. Falls keine genannt wurden, schreibe "Keine konkreten Action Items identifiziert".]
 
 ## Nächste Schritte
-[Geplante Folgemaßnahmen]
+[Geplante Folgemaßnahmen. Falls keine genannt wurden, schreibe "Keine nächsten Schritte definiert".]
+
+## Zusammenfassung
+[Eine kurze, prägnante Zusammenfassung des Meetings in 2-3 Sätzen.]
 
 ---
 
 TRANSKRIPT:
-${transcript}
-`;
+${transcript}`;
 
       const { text } = await generateText({
-        model: this.groq('llama3-8b-8192'),
+        model: this.groq('llama-3.3-70b-versatile'), // Using a more capable model
         prompt: prompt,
         temperature: 0.3,
         maxTokens: 4000
@@ -78,7 +117,22 @@ ${transcript}
       return text;
     } catch (error) {
       console.error('Summary generation failed:', error);
-      throw new Error('Zusammenfassung konnte nicht erstellt werden');
+      throw new Error('Zusammenfassung konnte nicht erstellt werden: ' + (error as Error).message);
+    }
+  }
+
+  async checkApiKey(): Promise<boolean> {
+    try {
+      // Test the API key with a simple request
+      const { text } = await generateText({
+        model: this.groq('llama-3.3-70b-versatile'),
+        prompt: 'Hello',
+        maxTokens: 5
+      });
+      return true;
+    } catch (error) {
+      console.error('API key validation failed:', error);
+      return false;
     }
   }
 
