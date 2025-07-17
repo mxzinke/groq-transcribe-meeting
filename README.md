@@ -1,563 +1,188 @@
-# Meeting Recorder App - Detaillierte Spezifikation
+# Meeting Recorder App
 
-## Projektübersicht
+A modern Electron-based desktop application for macOS that records, transcribes, and summarizes meetings using AI. Built with React, TypeScript, and Tailwind CSS, it provides a beautiful and intuitive interface for capturing and managing meeting content.
 
-Eine Electron-basierte Desktop-Anwendung für macOS, die Audio von System-Gesprächen (Signal, Google Meet, etc.) aufzeichnet, speichert und automatisch in Markdown-Transkripte und Zusammenfassungen umwandelt.
+## Features
 
-## Technologie-Stack
+- 🎙️ **Audio Recording**: Simultaneous capture of system audio and microphone input
+- 🤖 **AI Transcription**: Automatic transcription using Groq's Whisper model
+- 📝 **Smart Summaries**: AI-generated meeting summaries with key points and action items
+- 🌓 **Dark Mode**: Beautiful light and dark themes
+- 🔒 **Privacy First**: All data stored locally, only audio sent for transcription
+- 💾 **Local Storage**: Secure local storage of recordings and transcripts
 
-### Core Technologies
+## Tech Stack
 
-- **Electron**: Desktop-App Framework
-- **React**: Frontend UI
-- **Node.js**: Backend-Logik
-- **TypeScript**: Typsicherheit
-- **Tailwind CSS**: Styling
+- **Frontend**: React 18 with TypeScript
+- **Desktop Framework**: Electron with Vite
+- **Styling**: Tailwind CSS with custom design system
+- **AI Integration**: Groq API (Whisper + Llama models)
+- **State Management**: React Context API
+- **Testing**: Vitest + React Testing Library
 
-### Audio-Verarbeitung
+## Prerequisites
 
-- **electron-audio-loopback**: System-Audio-Erfassung
-- **MediaRecorder API**: Audio-Aufnahme-Steuerung
-- **File System**: Lokale Speicherung
+- Node.js 18+ and npm
+- macOS 11.0+ (Big Sur or newer)
+- Groq API key (get one at [console.groq.com](https://console.groq.com))
 
-### KI-Integration
+## Installation
 
-- **Vercel AI SDK**: KI-Framework
-- **Groq API**: Whisper-Modell für Transkription
-- **Groq LLM**: Zusammenfassung und Markdown-Generierung
-
-## Architektur
-
-### Hauptkomponenten
-
-```
-┌─────────────────────────────────────────────┐
-│                 Main Process                │
-│  ┌─────────────────┐  ┌─────────────────┐  │
-│  │  Audio Manager  │  │  File Manager   │  │
-│  └─────────────────┘  └─────────────────┘  │
-│  ┌─────────────────┐  ┌─────────────────┐  │
-│  │  AI Processor   │  │  Config Manager │  │
-│  └─────────────────┘  └─────────────────┘  │
-└─────────────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────┐
-│              Renderer Process               │
-│  ┌─────────────────┐  ┌─────────────────┐  │
-│  │  Recording UI   │  │  Settings UI    │  │
-│  └─────────────────┘  └─────────────────┘  │
-│  ┌─────────────────┐  ┌─────────────────┐  │
-│  │  History UI     │  │  Transcript UI  │  │
-│  └─────────────────┘  └─────────────────┘  │
-└─────────────────────────────────────────────┘
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/meeting-recorder.git
+cd meeting-recorder
 ```
 
-## Feature-Spezifikation
-
-### 1. Audio-Aufnahme
-
-**Funktionalität**: Simultane Aufnahme von System-Audio und Mikrofon
-
-**Implementierung**:
-
-```javascript
-// main/audio/AudioManager.js
-const { initMain } = require('electron-audio-loopback');
-
-class AudioManager {
-  constructor() {
-    this.isRecording = false;
-    this.mediaRecorder = null;
-    this.audioChunks = [];
-    this.initializeAudio();
-  }
-
-  async initializeAudio() {
-    initMain();
-    await this.setupAudioDevices();
-  }
-
-  async setupAudioDevices() {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        sampleRate: 44100
-      }
-    });
-    
-    // System-Audio mit Loopback erfassen
-    const systemStream = await navigator.mediaDevices.getDisplayMedia({
-      video: false,
-      audio: {
-        channelCount: 2,
-        sampleRate: 44100
-      }
-    });
-    
-    // Streams kombinieren
-    this.combinedStream = this.combineStreams(stream, systemStream);
-  }
-
-  startRecording() {
-    if (this.isRecording) return;
-    
-    this.mediaRecorder = new MediaRecorder(this.combinedStream, {
-      mimeType: 'audio/webm;codecs=opus'
-    });
-    
-    this.mediaRecorder.ondataavailable = (event) => {
-      if (event.data.size > 0) {
-        this.audioChunks.push(event.data);
-      }
-    };
-    
-    this.mediaRecorder.onstop = () => {
-      this.saveRecording();
-    };
-    
-    this.mediaRecorder.start(1000); // 1 Sekunde Chunks
-    this.isRecording = true;
-  }
-
-  stopRecording() {
-    if (!this.isRecording) return;
-    
-    this.mediaRecorder.stop();
-    this.isRecording = false;
-    return this.currentRecordingPath;
-  }
-
-  async saveRecording() {
-    const blob = new Blob(this.audioChunks, { type: 'audio/webm' });
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = `recording_${timestamp}.webm`;
-    const filePath = path.join(app.getPath('userData'), 'recordings', filename);
-    
-    await fs.promises.writeFile(filePath, Buffer.from(await blob.arrayBuffer()));
-    this.currentRecordingPath = filePath;
-    
-    // Automatische Transkription starten
-    this.processRecording(filePath);
-  }
-}
+2. Install dependencies:
+```bash
+npm install
 ```
 
-### 2. KI-Transkription mit Groq
-
-**Funktionalität**: Automatische Transkription nach Aufnahme-Ende
-
-**Implementierung**:
-
-```javascript
-// main/ai/TranscriptionService.js
-import { createGroq } from '@ai-sdk/groq';
-import { transcribe } from 'ai';
-
-class TranscriptionService {
-  constructor() {
-    this.groq = createGroq({
-      apiKey: process.env.GROQ_API_KEY
-    });
-  }
-
-  async transcribeAudio(audioFilePath) {
-    try {
-      const audioBuffer = await fs.promises.readFile(audioFilePath);
-      
-      const { text } = await transcribe({
-        model: this.groq.speech('whisper-large-v3-turbo'),
-        audio: audioBuffer,
-        language: 'de', // Deutsch
-        response_format: 'verbose_json',
-        timestamp_granularities: ['segment']
-      });
-
-      return {
-        transcription: text,
-        segments: text.segments,
-        timestamp: new Date().toISOString()
-      };
-    } catch (error) {
-      console.error('Transkription fehlgeschlagen:', error);
-      throw error;
-    }
-  }
-}
+3. Start the development server:
+```bash
+npm start
 ```
 
-### 3. Zusammenfassung und Markdown-Generierung
+## Development
 
-**Funktionalität**: Automatische Meeting-Zusammenfassung als Markdown
+### Available Scripts
 
-**Implementierung**:
+- `npm start` - Start the app in development mode
+- `npm test` - Run unit tests
+- `npm run test:ui` - Run tests with UI
+- `npm run lint` - Lint the codebase
+- `npm run package` - Package the app for distribution
+- `npm run make` - Create platform-specific installers
 
-```javascript
-// main/ai/SummaryService.js
-import { createGroq } from '@ai-sdk/groq';
-import { generateText } from 'ai';
+### Project Structure
 
-class SummaryService {
-  constructor() {
-    this.groq = createGroq({
-      apiKey: process.env.GROQ_API_KEY
-    });
-  }
+```
+meeting-recorder/
+├── src/
+│   ├── main.ts           # Electron main process
+│   ├── preload.ts        # Preload script for IPC
+│   ├── renderer.ts       # React app entry point
+│   ├── App.tsx           # Main React component
+│   ├── components/       # React components
+│   ├── contexts/         # React contexts
+│   ├── services/         # Business logic
+│   ├── tests/           # Unit tests
+│   └── types/           # TypeScript types
+├── index.html           # HTML template
+├── tailwind.config.js   # Tailwind configuration
+└── vite.*.config.ts     # Vite configurations
+```
 
-  async generateSummary(transcription, metadata = {}) {
-    const prompt = `
-Analysiere das folgende Meeting-Transkript und erstelle eine strukturierte Zusammenfassung im Markdown-Format:
+### Architecture Overview
 
-# Meeting-Zusammenfassung
+The app follows a clean architecture pattern:
 
-## Metadaten
-- **Datum**: ${metadata.date || 'Unbekannt'}
-- **Dauer**: ${metadata.duration || 'Unbekannt'}
-- **Teilnehmer**: ${metadata.participants || 'Unbekannt'}
+1. **Main Process** (`src/main.ts`): Handles system-level operations, window management, and IPC communication
+2. **Renderer Process** (`src/renderer.ts`): React application with UI components
+3. **Preload Script** (`src/preload.ts`): Secure bridge between main and renderer processes
+4. **Services Layer**: Business logic for audio processing and AI integration
+5. **Context Providers**: Global state management for recording and theming
 
-## Hauptthemen
-[Extrahiere die wichtigsten Diskussionspunkte]
+### Key Components
 
-## Entscheidungen
-[Liste alle getroffenen Entscheidungen auf]
+- **RecordingInterface**: Main recording UI with start/stop controls
+- **MeetingHistory**: List view of past recordings
+- **SettingsView**: Configuration for API keys and preferences
+- **RecordingContext**: Global recording state and logic
+- **AIService**: Integration with Groq API for transcription and summarization
 
-## Action Items
-[Konkrete Aufgaben und Zuständigkeiten]
+## Building for Production
 
-## Nächste Schritte
-[Geplante Folgemaßnahmen]
+### macOS
 
-## Vollständiges Transkript
-[Strukturiertes Transkript mit Zeitstempeln]
+```bash
+npm run make
+```
+
+This will create a `.dmg` file in the `out/make` directory.
+
+### Code Signing (Required for distribution)
+
+1. Obtain an Apple Developer certificate
+2. Configure electron-forge with your certificate details
+3. Build with: `npm run make -- --arch=universal`
+
+## API Integration
+
+### Groq Setup
+
+1. Sign up at [groq.com](https://groq.com)
+2. Generate an API key from the console
+3. Add the key in the app's Settings page
+
+### Models Used
+
+- **Transcription**: `whisper-large-v3-turbo` - Fast and accurate speech-to-text
+- **Summarization**: `llama3-8b-8192` - Intelligent meeting summaries
+
+## Contributing
+
+We welcome contributions! Please follow these steps:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+### Code Style
+
+- Use TypeScript for all new code
+- Follow the existing component structure
+- Write tests for new features
+- Use conventional commits
+
+### Testing
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:ui
+
+# Run tests once
+npm run test:run
+```
+
+## Privacy & Security
+
+- **Local First**: All recordings and transcripts are stored locally
+- **Minimal Data Sharing**: Only audio is sent to Groq for transcription
+- **No Telemetry**: No usage data or analytics collected
+- **Secure Storage**: API keys stored securely using electron-store
+
+## Troubleshooting
+
+### Audio Permissions
+
+On macOS, you'll need to grant microphone permissions:
+1. System Preferences → Security & Privacy → Microphone
+2. Check the box next to Meeting Recorder
+
+### Common Issues
+
+- **No audio recording**: Check microphone permissions and audio input settings
+- **Transcription fails**: Verify your Groq API key is valid
+- **App won't start**: Try deleting `node_modules` and reinstalling
+
+## License
+
+MIT License - see LICENSE file for details
+
+## Acknowledgments
+
+- Built with [Electron Forge](https://www.electronforge.io/)
+- UI components inspired by [Tailwind UI](https://tailwindui.com/)
+- Icons from [Lucide](https://lucide.dev/)
+- AI powered by [Groq](https://groq.com/)
 
 ---
 
-TRANSKRIPT:
-${transcription}
-`;
-
-    const { text } = await generateText({
-      model: this.groq('llama3-8b-8192'),
-      prompt: prompt,
-      temperature: 0.3,
-      maxTokens: 4000
-    });
-
-    return text;
-  }
-}
-```
-
-### 4. Benutzeroberfläche
-
-**Funktionalität**: Intuitive Aufnahme-Steuerung und Transkript-Anzeige
-
-**Implementierung**:
-
-```jsx
-// src/components/RecordingInterface.tsx
-import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Mic, Square, FileText, Settings } from 'lucide-react';
-
-const RecordingInterface: React.FC = () => {
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingDuration, setRecordingDuration] = useState(0);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [currentTranscript, setCurrentTranscript] = useState('');
-
-  useEffect(() => {
-    // IPC-Listener für Audio-Events
-    window.electronAPI.onRecordingStatusChanged((status) => {
-      setIsRecording(status.isRecording);
-      setRecordingDuration(status.duration);
-    });
-
-    window.electronAPI.onTranscriptionComplete((transcript) => {
-      setCurrentTranscript(transcript);
-      setIsProcessing(false);
-    });
-  }, []);
-
-  const handleStartRecording = async () => {
-    const hasPermission = await window.electronAPI.requestAudioPermission();
-    if (hasPermission) {
-      await window.electronAPI.startRecording();
-    }
-  };
-
-  const handleStopRecording = async () => {
-    setIsProcessing(true);
-    await window.electronAPI.stopRecording();
-  };
-
-  return (
-    <div className="max-w-4xl mx-auto p-6">
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Mic className="w-5 h-5" />
-            Meeting Recorder
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-4 mb-4">
-            <Button
-              onClick={handleStartRecording}
-              disabled={isRecording}
-              className="flex items-center gap-2"
-            >
-              <Mic className="w-4 h-4" />
-              Aufnahme starten
-            </Button>
-            
-            <Button
-              onClick={handleStopRecording}
-              disabled={!isRecording}
-              variant="destructive"
-              className="flex items-center gap-2"
-            >
-              <Square className="w-4 h-4" />
-              Stoppen
-            </Button>
-            
-            <div className="flex items-center gap-2">
-              <span className={`w-3 h-3 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-gray-300'}`}></span>
-              <span className="text-sm text-gray-600">
-                {isRecording ? `Aufnahme läuft - ${Math.floor(recordingDuration / 60)}:${(recordingDuration % 60).toString().padStart(2, '0')}` : 'Bereit'}
-              </span>
-            </div>
-          </div>
-
-          {isProcessing && (
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <div className="flex items-center gap-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                <span className="text-sm text-blue-600">Transkription wird verarbeitet...</span>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {currentTranscript && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="w-5 h-5" />
-              Meeting-Zusammenfassung
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="prose max-w-none">
-              <pre className="whitespace-pre-wrap text-sm bg-gray-50 p-4 rounded-lg overflow-auto">
-                {currentTranscript}
-              </pre>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-};
-
-export default RecordingInterface;
-```
-
-### 5. Dateiverwaltung
-
-**Funktionalität**: Automatische Organisation und Speicherung
-
-**Implementierung**:
-
-```javascript
-// main/storage/FileManager.js
-const path = require('path');
-const fs = require('fs').promises;
-
-class FileManager {
-  constructor() {
-    this.baseDir = path.join(app.getPath('userData'), 'meetings');
-    this.ensureDirectories();
-  }
-
-  async ensureDirectories() {
-    await fs.mkdir(path.join(this.baseDir, 'recordings'), { recursive: true });
-    await fs.mkdir(path.join(this.baseDir, 'transcripts'), { recursive: true });
-    await fs.mkdir(path.join(this.baseDir, 'summaries'), { recursive: true });
-  }
-
-  async saveRecording(audioBlob, metadata) {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = `meeting_${timestamp}.webm`;
-    const filePath = path.join(this.baseDir, 'recordings', filename);
-    
-    await fs.writeFile(filePath, Buffer.from(await audioBlob.arrayBuffer()));
-    
-    // Metadaten speichern
-    const metadataPath = path.join(this.baseDir, 'recordings', `${filename}.json`);
-    await fs.writeFile(metadataPath, JSON.stringify({
-      ...metadata,
-      filename,
-      timestamp,
-      path: filePath
-    }, null, 2));
-    
-    return filePath;
-  }
-
-  async saveTranscript(transcript, audioFilePath) {
-    const audioFilename = path.basename(audioFilePath, '.webm');
-    const transcriptPath = path.join(this.baseDir, 'transcripts', `${audioFilename}.txt`);
-    
-    await fs.writeFile(transcriptPath, transcript);
-    return transcriptPath;
-  }
-
-  async saveSummary(summary, audioFilePath) {
-    const audioFilename = path.basename(audioFilePath, '.webm');
-    const summaryPath = path.join(this.baseDir, 'summaries', `${audioFilename}.md`);
-    
-    await fs.writeFile(summaryPath, summary);
-    return summaryPath;
-  }
-
-  async getMeetingHistory() {
-    const recordings = await fs.readdir(path.join(this.baseDir, 'recordings'));
-    const meetings = [];
-    
-    for (const file of recordings) {
-      if (file.endsWith('.json')) {
-        const metadata = JSON.parse(
-          await fs.readFile(path.join(this.baseDir, 'recordings', file), 'utf8')
-        );
-        meetings.push(metadata);
-      }
-    }
-    
-    return meetings.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  }
-}
-```
-
-## Projekt-Setup
-
-### Installation
-
-```bash
-# Projekt erstellen
-npm create electron-app@latest meeting-recorder -- --template=typescript-webpack
-
-cd meeting-recorder
-
-# Dependencies installieren
-npm install electron-audio-loopback @ai-sdk/groq ai
-npm install react react-dom @types/react @types/react-dom
-npm install tailwindcss @tailwindcss/typography
-npm install lucide-react
-
-# Dev Dependencies
-npm install --save-dev @types/node concurrently
-```
-
-### Konfiguration
-
-```javascript
-// main.js
-const { app, BrowserWindow, ipcMain } = require('electron');
-const { initMain } = require('electron-audio-loopback');
-
-// Audio-Loopback initialisieren
-initMain();
-
-// App-Initialisierung
-app.whenReady().then(() => {
-  createWindow();
-  setupIPC();
-});
-
-function createWindow() {
-  const mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
-    }
-  });
-
-  // macOS Berechtigungen anfordern
-  if (process.platform === 'darwin') {
-    systemPreferences.askForMediaAccess('microphone');
-  }
-}
-```
-
-### Umgebungsvariablen
-
-```bash
-# .env
-GROQ_API_KEY=your_groq_api_key_here
-```
-
-## Sicherheit und Datenschutz
-
-### Berechtigungen
-
-- Mikrofon-Zugriff erforderlich
-- System-Audio-Zugriff (macOS-spezifisch)
-- Dateisystem-Zugriff für lokale Speicherung
-
-### Datenschutz
-
-- Alle Daten bleiben lokal gespeichert
-- Nur Audio-Transkription wird an Groq gesendet
-- Keine Metadaten oder persönliche Informationen in der Cloud
-
-### Zustimmung
-
-- Explizite Zustimmung vor jeder Aufnahme
-- Sichtbare Aufnahme-Indikatoren
-- Einfache Stopp-Funktionalität
-
-## Deployment
-
-### Build-Prozess
-
-```bash
-# Electron-Builder für Distribution
-npm install --save-dev electron-builder
-
-# Build für macOS
-npm run build:mac
-```
-
-### Code-Signing (macOS)
-
-```bash
-# Entwickler-Zertifikat erforderlich für System-Audio-Zugriff
-electron-builder --mac --publish=never
-```
-
-## Erweiterungsmöglichkeiten
-
-1. **Multi-Sprach-Support**: Automatische Spracherkennung
-1. **Cloud-Sync**: Optionale Synchronisation mit Cloud-Diensten
-1. **Meeting-Planung**: Integration mit Kalender-Apps
-1. **Collaboration**: Sharing-Funktionen für Teams
-1. **Analytics**: Meeting-Statistiken und Trends
-
-## Geschätzte Entwicklungszeit
-
-- **MVP (Grundfunktionen)**: 3-4 Wochen
-- **Vollständige Implementierung**: 6-8 Wochen
-- **Testing und Polishing**: 2-3 Wochen
-
-## Kosten
-
-- **Groq API**: ~$0.111 pro Stunde Audio-Transkription
-- **Entwicklerkosten**: Apple Developer Account ($99/Jahr) für Code-Signing
-- **Hosting**: Nur für Updates/Distribution nötig
+**Note**: This is an open-source project created for educational purposes. For production use, ensure proper security auditing and compliance with data protection regulations.
