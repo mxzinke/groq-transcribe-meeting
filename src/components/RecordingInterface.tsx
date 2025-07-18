@@ -6,6 +6,9 @@ import {
   Loader2,
   Users,
   MessageSquare,
+  Settings,
+  Speaker,
+  RefreshCw,
 } from "lucide-react";
 import { useRecording } from "../contexts/RecordingContext";
 
@@ -14,7 +17,7 @@ const RecordingInterface: React.FC = () => {
 
   useEffect(() => {
     const checkApiKey = async () => {
-      const apiKey = await window.electronAPI.store.get("apiKey");
+      const apiKey = await window.electronAPI.store.get("groqApiKey");
       setHasApiKeySet(!!apiKey);
     };
     checkApiKey();
@@ -29,12 +32,16 @@ const RecordingInterface: React.FC = () => {
     meetingTitle,
     meetingParticipants,
     additionalContext,
+    availableDevices,
+    selectedDeviceId,
     startRecording,
     stopRecording,
     setMeetingTitle,
     setMeetingParticipants,
     setAdditionalContext,
     clearMeetingMetadata,
+    setSelectedDeviceId,
+    refreshDevices,
   } = useRecording();
 
   const formatDuration = (seconds: number) => {
@@ -61,6 +68,10 @@ const RecordingInterface: React.FC = () => {
         {!isProcessing && (
           <div className="mb-8">
             <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                Meeting Details
+              </h3>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Meeting Title
@@ -169,11 +180,14 @@ const RecordingInterface: React.FC = () => {
           {!isRecording && !isProcessing && (
             <button
               onClick={startRecording}
-              className="group relative inline-flex items-center justify-center p-8 rounded-full bg-primary hover:bg-blue-600 transition-all duration-200 transform hover:scale-105 shadow-lg"
+              disabled={availableDevices.length === 0}
+              className="group relative inline-flex items-center justify-center p-8 rounded-full bg-primary hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 shadow-lg"
             >
               <Mic className="w-12 h-12 text-white" />
               <span className="absolute -bottom-8 text-sm font-medium text-gray-600 dark:text-gray-400">
-                Start recording
+                {availableDevices.length === 0
+                  ? "No microphone"
+                  : "Start recording"}
               </span>
             </button>
           )}
@@ -262,21 +276,75 @@ const RecordingInterface: React.FC = () => {
             <div className="p-4 bg-blue-50 dark:bg-gray-700 rounded-lg">
               <p className="text-sm text-blue-800 dark:text-blue-200">
                 <strong>Audio Setup:</strong> The app will automatically record
-                both your microphone and system audio. Make sure to grant
-                necessary permissions when prompted.
+                both your selected microphone and system audio. Make sure to
+                grant necessary permissions when prompted.
               </p>
             </div>
-            {hasApiKeySet && (
+            {!hasApiKeySet && (
               <div className="p-4 bg-amber-50 dark:bg-gray-700 rounded-lg">
                 <p className="text-sm text-amber-800 dark:text-amber-200">
-                  <strong>AI Processing:</strong> Don't forget to configure your
-                  Groq API key in the settings for automatic transcription and
-                  summarization.
+                  <strong>AI Processing:</strong> Configure your Groq API key in
+                  settings for automatic transcription and summarization.
                 </p>
               </div>
             )}
           </div>
         )}
+
+        {/* Audio Device Selection */}
+        <div className="mt-8">
+          <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                <Settings className="w-5 h-5" />
+                Audio Setup
+              </h3>
+              <button
+                onClick={refreshDevices}
+                className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                title="Refresh devices"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <Mic className="w-4 h-4 inline mr-1" />
+                Microphone Device
+              </label>
+              <select
+                value={selectedDeviceId}
+                onChange={(e) => setSelectedDeviceId(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-600 dark:text-white"
+              >
+                {availableDevices.map((device) => (
+                  <option key={device.deviceId} value={device.deviceId}>
+                    {device.label}
+                  </option>
+                ))}
+              </select>
+              {availableDevices.length === 0 && (
+                <p className="mt-1 text-xs text-red-500">
+                  No microphone devices found. Please check your permissions.
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3 text-sm">
+              <Speaker className="w-4 h-4 text-blue-500" />
+              <span className="text-gray-700 dark:text-gray-300">
+                System Audio:
+                <span className="ml-1 text-green-600 dark:text-green-400 font-medium">
+                  Auto-detected
+                </span>
+              </span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                (includes computer sound, applications, etc.)
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

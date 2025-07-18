@@ -55,16 +55,12 @@ const createWindow = (): void => {
       path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
     );
   }
-
-  // Open the DevTools in development.
-  if (process.env.NODE_ENV === "development") {
-    mainWindow.webContents.openDevTools();
-  }
 };
 
 // Request audio permissions on macOS
 const requestAudioPermissions = async () => {
   if (process.platform === "darwin") {
+    // Request microphone permission
     const microphoneStatus =
       systemPreferences.getMediaAccessStatus("microphone");
 

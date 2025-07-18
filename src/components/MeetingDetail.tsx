@@ -1,6 +1,5 @@
-import React from "react";
+import React, { useState } from "react";
 import { X, FileText, Download, Copy, Check, Edit2 } from "lucide-react";
-import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useRecording } from "../contexts/RecordingContext";

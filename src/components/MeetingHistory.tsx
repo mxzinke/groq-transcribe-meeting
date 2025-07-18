@@ -65,24 +65,10 @@ const MeetingHistory: React.FC = () => {
     setEditingId(null);
     setEditedTitle("");
   };
-
-  const handleDownloadAudio = async (recording: any) => {
-    try {
-      // In an Electron app, we would need to implement this through the main process
-      // For now, let's show a message that this feature would need backend implementation
-      alert(
-        "Audio download functionality would need to be implemented in the Electron main process to access the stored audio files.",
-      );
-    } catch (error) {
-      console.error("Failed to download audio:", error);
-      alert("Failed to download audio file.");
-    }
-  };
-
   if (recordings.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="text-center">
+      <div className="flex-1 flex items-center justify-center p-8 h-full">
+        <div className="text-center h-fit">
           <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">
             No recordings found

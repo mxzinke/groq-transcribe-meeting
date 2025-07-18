@@ -23,6 +23,11 @@ interface Recording {
   };
 }
 
+interface AudioDevice {
+  deviceId: string;
+  label: string;
+}
+
 interface RecordingContextType {
   isRecording: boolean;
   isProcessing: boolean;
@@ -33,6 +38,8 @@ interface RecordingContextType {
   meetingTitle: string;
   meetingParticipants: string;
   additionalContext: string;
+  availableDevices: AudioDevice[];
+  selectedDeviceId: string;
   startRecording: () => Promise<void>;
   stopRecording: () => Promise<void>;
   deleteRecording: (id: string) => Promise<void>;
@@ -42,27 +49,166 @@ interface RecordingContextType {
   setMeetingParticipants: (participants: string) => void;
   setAdditionalContext: (context: string) => void;
   clearMeetingMetadata: () => void;
+  setSelectedDeviceId: (deviceId: string) => void;
+  refreshDevices: () => Promise<void>;
 }
 
 const RecordingContext = createContext<RecordingContextType | undefined>(
   undefined,
 );
 
-const createMixedAudioStream = async (): Promise<MediaStream> => {
+// Audio mixer class for combining microphone and system audio
+class AudioMixer {
+  private audioContext: AudioContext | null = null;
+  private micSource: MediaStreamAudioSourceNode | null = null;
+  private systemSource: MediaStreamAudioSourceNode | null = null;
+  private merger: ChannelMergerNode | null = null;
+  private destination: MediaStreamAudioDestinationNode | null = null;
+  private analyser: AnalyserNode | null = null;
+
+  async createCombinedStream(
+    micStream: MediaStream,
+    systemStream?: MediaStream,
+  ): Promise<{ combinedStream: MediaStream; analyser: AnalyserNode }> {
+    // Create audio context
+    this.audioContext = new (window.AudioContext ||
+      (window as any).webkitAudioContext)();
+
+    if (this.audioContext.state === "suspended") {
+      await this.audioContext.resume();
+    }
+
+    // Create analyser for audio level monitoring
+    this.analyser = this.audioContext.createAnalyser();
+    this.analyser.fftSize = 2048;
+    this.analyser.smoothingTimeConstant = 0.3;
+
+    // Create sources
+    this.micSource = this.audioContext.createMediaStreamSource(micStream);
+
+    if (systemStream) {
+      // If we have system audio, mix both streams
+      this.systemSource =
+        this.audioContext.createMediaStreamSource(systemStream);
+
+      // Create merger to combine audio
+      this.merger = this.audioContext.createChannelMerger(2);
+
+      // Connect microphone to left channel and system audio to right channel
+      this.micSource.connect(this.merger, 0, 0);
+      this.systemSource.connect(this.merger, 0, 1);
+
+      // Create destination stream
+      this.destination = this.audioContext.createMediaStreamDestination();
+      this.merger.connect(this.destination);
+      this.merger.connect(this.analyser);
+    } else {
+      // Only microphone audio
+      this.destination = this.audioContext.createMediaStreamDestination();
+      this.micSource.connect(this.destination);
+      this.micSource.connect(this.analyser);
+    }
+
+    return {
+      combinedStream: this.destination.stream,
+      analyser: this.analyser,
+    };
+  }
+
+  cleanup() {
+    this.micSource?.disconnect();
+    this.systemSource?.disconnect();
+    this.merger?.disconnect();
+    this.destination?.disconnect();
+    this.analyser?.disconnect();
+
+    if (this.audioContext && this.audioContext.state !== "closed") {
+      this.audioContext.close();
+    }
+
+    this.audioContext = null;
+    this.micSource = null;
+    this.systemSource = null;
+    this.merger = null;
+    this.destination = null;
+    this.analyser = null;
+  }
+}
+
+const createMicrophoneStream = async (
+  deviceId?: string,
+): Promise<MediaStream> => {
   try {
-    console.log("Mixed audio stream created (mic + system)");
-    return await (window as any).getLoopbackAudioMediaStream();
-  } catch (error) {
-    console.error("Failed to create mixed audio stream:", error);
-    // Fallback to microphone only
-    return await navigator.mediaDevices.getUserMedia({
+    const constraints: MediaStreamConstraints = {
       audio: {
+        deviceId: deviceId ? { exact: deviceId } : undefined,
         echoCancellation: true,
         noiseSuppression: true,
         sampleRate: 44100,
       },
-    });
+    };
+
+    return await navigator.mediaDevices.getUserMedia(constraints);
+  } catch (error) {
+    console.error("Failed to create microphone stream:", error);
+    throw error;
   }
+};
+
+const createSystemAudioStream = async (): Promise<MediaStream | null> => {
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 1000; // 1 second
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(
+        `Attempting to get system audio stream (attempt ${attempt}/${MAX_RETRIES})`,
+      );
+
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("System audio timeout")), 10000),
+      );
+
+      const streamPromise = (window as any).getLoopbackAudioMediaStream();
+
+      const stream = await Promise.race([streamPromise, timeoutPromise]);
+
+      // Validate that the stream has audio tracks
+      if (stream && stream.getAudioTracks().length > 0) {
+        const audioTracks = stream.getAudioTracks();
+        console.log(
+          `System audio stream acquired with ${audioTracks.length} audio track(s)`,
+        );
+
+        // Verify that at least one audio track is enabled
+        const enabledTracks = audioTracks.filter(
+          (track: MediaStreamTrack) => track.enabled,
+        );
+        if (enabledTracks.length === 0) {
+          console.warn("System audio tracks are disabled, enabling them");
+          audioTracks.forEach(
+            (track: MediaStreamTrack) => (track.enabled = true),
+          );
+        }
+
+        return stream;
+      } else {
+        throw new Error("No audio tracks found in system stream");
+      }
+    } catch (error) {
+      console.error(`System audio attempt ${attempt} failed:`, error);
+
+      // If this isn't the last attempt, wait before retrying
+      if (attempt < MAX_RETRIES) {
+        console.log(`Retrying in ${RETRY_DELAY}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+      }
+    }
+  }
+
+  console.warn("Failed to acquire system audio after all retries");
+  return null;
 };
 
 export const RecordingProvider: React.FC<{ children: React.ReactNode }> = ({
@@ -78,14 +224,18 @@ export const RecordingProvider: React.FC<{ children: React.ReactNode }> = ({
   const [meetingTitle, setMeetingTitle] = useState("");
   const [meetingParticipants, setMeetingParticipants] = useState("");
   const [additionalContext, setAdditionalContext] = useState("");
+  const [availableDevices, setAvailableDevices] = useState<AudioDevice[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState("");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const currentStreamRef = useRef<null | MediaStream>(null);
+  const audioMixerRef = useRef<AudioMixer | null>(null);
+  const combinedStreamRef = useRef<MediaStream | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const systemStreamRef = useRef<MediaStream | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
 
   // Initialize AI Service when API key is available
   useEffect(() => {
@@ -104,6 +254,7 @@ export const RecordingProvider: React.FC<{ children: React.ReactNode }> = ({
 
     initializeAIService();
     loadRecordings();
+    refreshDevices();
     startAudioMonitoring();
 
     return () => {
@@ -114,34 +265,54 @@ export const RecordingProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, []);
 
+  const refreshDevices = async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioInputs = devices
+        .filter((device) => device.kind === "audioinput")
+        .map((device) => ({
+          deviceId: device.deviceId,
+          label: device.label || `Microphone ${device.deviceId.slice(0, 8)}`,
+        }));
+
+      setAvailableDevices(audioInputs);
+
+      // Set default device if none selected
+      if (!selectedDeviceId && audioInputs.length > 0) {
+        setSelectedDeviceId(audioInputs[0].deviceId);
+      }
+    } catch (error) {
+      console.error("Failed to enumerate audio devices:", error);
+    }
+  };
+
   const startAudioMonitoring = async () => {
     try {
-      // Get microphone for audio level monitoring
-      const micStream = await createMixedAudioStream();
+      await stopAudioMonitoring(); // Clean up any existing monitoring
 
-      // Create audio context for monitoring
-      audioContextRef.current = new (window.AudioContext ||
-        (window as any).webkitAudioContext)();
-      const audioContext = audioContextRef.current;
+      // Create microphone stream
+      const micStream = await createMicrophoneStream(selectedDeviceId);
+      micStreamRef.current = micStream;
 
-      if (audioContext.state === "suspended") {
-        await audioContext.resume();
-      }
+      // Try to get system audio stream
+      const systemStream = await createSystemAudioStream();
+      systemStreamRef.current = systemStream;
 
-      // Create analyser node
-      analyserRef.current = audioContext.createAnalyser();
-      const analyser = analyserRef.current;
-      analyser.fftSize = 2048;
-      analyser.smoothingTimeConstant = 0.3;
+      // Create audio mixer
+      audioMixerRef.current = new AudioMixer();
+      const { combinedStream, analyser } =
+        await audioMixerRef.current.createCombinedStream(
+          micStream,
+          systemStream || undefined,
+        );
 
-      // Create audio source node
-      const audioSource = audioContext.createMediaStreamSource(micStream);
-      audioSource.connect(analyser);
+      combinedStreamRef.current = combinedStream;
+      analyserRef.current = analyser;
 
       // Start audio level monitoring
       startAudioLevelLoop();
 
-      console.log("Audio monitoring started");
+      console.log("Audio monitoring started with combined stream");
     } catch (error) {
       console.error("Failed to start audio monitoring:", error);
       setAudioLevel(0);
@@ -177,7 +348,7 @@ export const RecordingProvider: React.FC<{ children: React.ReactNode }> = ({
     updateAudioLevel();
   };
 
-  const stopAudioMonitoring = () => {
+  const stopAudioMonitoring = async () => {
     console.log("Stopping audio monitoring...");
 
     if (animationFrameRef.current) {
@@ -185,23 +356,39 @@ export const RecordingProvider: React.FC<{ children: React.ReactNode }> = ({
       animationFrameRef.current = null;
     }
 
-    if (audioContextRef.current && audioContextRef.current.state !== "closed") {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
+    // Clean up audio mixer
+    if (audioMixerRef.current) {
+      audioMixerRef.current.cleanup();
+      audioMixerRef.current = null;
+    }
+
+    // Stop and clean up streams
+    if (micStreamRef.current && !isRecording) {
+      micStreamRef.current.getTracks().forEach((track) => track.stop());
+      micStreamRef.current = null;
+    }
+
+    if (systemStreamRef.current && !isRecording) {
+      systemStreamRef.current.getTracks().forEach((track) => track.stop());
+      systemStreamRef.current = null;
+    }
+
+    if (combinedStreamRef.current && !isRecording) {
+      combinedStreamRef.current.getTracks().forEach((track) => track.stop());
+      combinedStreamRef.current = null;
     }
 
     analyserRef.current = null;
-
-    if (currentStreamRef.current && !isRecording) {
-      currentStreamRef.current.getTracks().forEach((track) => {
-        track.stop();
-      });
-      currentStreamRef.current = null;
-    }
-
     setAudioLevel(0);
     console.log("Audio monitoring stopped");
   };
+
+  // Restart audio monitoring when device changes
+  useEffect(() => {
+    if (!isRecording) {
+      startAudioMonitoring();
+    }
+  }, [selectedDeviceId]);
 
   const loadRecordings = async () => {
     try {
@@ -230,12 +417,25 @@ export const RecordingProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const startRecording = async () => {
     try {
-      // Create audio stream with mic + system audio
-      const audioStream =
-        currentStreamRef.current || (await createMixedAudioStream());
+      // Use the existing combined stream or create a new one
+      let recordingStream = combinedStreamRef.current;
+
+      if (!recordingStream) {
+        // Create streams if not available
+        const micStream = await createMicrophoneStream(selectedDeviceId);
+        const systemStream = await createSystemAudioStream();
+
+        audioMixerRef.current = new AudioMixer();
+        const { combinedStream } =
+          await audioMixerRef.current.createCombinedStream(
+            micStream,
+            systemStream || undefined,
+          );
+        recordingStream = combinedStream;
+      }
 
       // Create media recorder
-      const mediaRecorder = new MediaRecorder(audioStream, {
+      const mediaRecorder = new MediaRecorder(recordingStream, {
         mimeType: "audio/webm;codecs=opus",
       });
 
@@ -266,10 +466,12 @@ export const RecordingProvider: React.FC<{ children: React.ReactNode }> = ({
         setCurrentDuration(Math.floor((Date.now() - startTime) / 1000));
       }, 1000);
 
-      console.log("Recording started");
+      console.log("Recording started with combined stream");
     } catch (error) {
       console.error("Failed to start recording:", error);
-      alert("Error starting recording. Please check permissions.");
+      alert(
+        "Error starting recording. Please check permissions and device selection.",
+      );
     }
   };
 
@@ -280,18 +482,17 @@ export const RecordingProvider: React.FC<{ children: React.ReactNode }> = ({
 
       mediaRecorderRef.current.stop();
 
-      // Stop all tracks
-      if (mediaRecorderRef.current.stream) {
-        mediaRecorderRef.current.stream
-          .getTracks()
-          .forEach((track) => track.stop());
-      }
-
       if (durationIntervalRef.current) {
         clearInterval(durationIntervalRef.current);
       }
 
       setIsRecording(false);
+
+      // Restart audio monitoring after recording stops
+      setTimeout(() => {
+        startAudioMonitoring();
+      }, 100);
+
       console.log("Recording stopped");
     }
   };
@@ -423,6 +624,8 @@ export const RecordingProvider: React.FC<{ children: React.ReactNode }> = ({
     meetingTitle,
     meetingParticipants,
     additionalContext,
+    availableDevices,
+    selectedDeviceId,
     startRecording,
     stopRecording,
     deleteRecording,
@@ -432,6 +635,8 @@ export const RecordingProvider: React.FC<{ children: React.ReactNode }> = ({
     setMeetingParticipants,
     setAdditionalContext,
     clearMeetingMetadata,
+    setSelectedDeviceId,
+    refreshDevices,
   };
 
   return (

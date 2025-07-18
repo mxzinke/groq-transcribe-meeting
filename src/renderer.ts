@@ -39,24 +39,24 @@ async function getLoopbackAudioMediaStream() {
 
   // Get a MediaStream with system audio loopback.
   // `getDisplayMedia` will fail if you don't request `video: true`.
-  const stream = await navigator.mediaDevices.getDisplayMedia({ 
+  const stream = await navigator.mediaDevices.getDisplayMedia({
     video: true,
     audio: true,
   });
-  
+
   // Remove video tracks that we don't need.
   // Note: You may find bugs if you don't remove video tracks.
   const videoTracks = stream.getVideoTracks();
 
-  videoTracks.forEach(track => {
-      track.stop();
-      stream.removeTrack(track);
+  videoTracks.forEach((track) => {
+    track.stop();
+    stream.removeTrack(track);
   });
 
   // Tell the main process to disable system audio loopback.
   // This will restore full `getDisplayMedia` functionality.
   await window.electronAPI.disableLoopbackAudio();
-  
+
   // Boom! You've got a MediaStream with system audio loopback.
   // Use it with an audio element or Web Audio API.
   return stream;
