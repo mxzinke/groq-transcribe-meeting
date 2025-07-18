@@ -11,8 +11,12 @@ import Store from "electron-store";
 import { initMain } from "electron-audio-loopback";
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (require("electron-squirrel-startup")) {
-  app.quit();
+try {
+  if (require("electron-squirrel-startup")) {
+    app.quit();
+  }
+} catch (error) {
+  // electron-squirrel-startup is not available, continue normally
 }
 
 // Initialize electron store
@@ -33,8 +37,9 @@ const createWindow = (): void => {
     height: 800,
     minWidth: 1000,
     minHeight: 600,
-    titleBarStyle: "hiddenInset",
+    titleBarStyle: "default",
     backgroundColor: "#ffffff",
+    movable: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       nodeIntegration: false,
@@ -123,5 +128,3 @@ ipcMain.handle("store-delete", (_, key: string) => {
   (store as any).delete(key);
   return true;
 });
-
-

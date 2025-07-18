@@ -132,7 +132,7 @@ export const RecordingProvider: React.FC<{ children: React.ReactNode }> = ({
       analyserRef.current = audioContext.createAnalyser();
       const analyser = analyserRef.current;
       analyser.fftSize = 2048;
-      analyser.smoothingTimeConstant = 0.05;
+      analyser.smoothingTimeConstant = 0.3;
 
       // Create audio source node
       const audioSource = audioContext.createMediaStreamSource(micStream);
@@ -231,7 +231,8 @@ export const RecordingProvider: React.FC<{ children: React.ReactNode }> = ({
   const startRecording = async () => {
     try {
       // Create audio stream with mic + system audio
-      const audioStream = currentStreamRef.current || (await createMixedAudioStream());
+      const audioStream =
+        currentStreamRef.current || (await createMixedAudioStream());
 
       // Create media recorder
       const mediaRecorder = new MediaRecorder(audioStream, {
@@ -403,7 +404,7 @@ export const RecordingProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const updateRecording = async (id: string, updates: Partial<Recording>) => {
     const updatedRecordings = recordings.map((rec) =>
-      rec.id === id ? { ...rec, ...updates } : rec
+      rec.id === id ? { ...rec, ...updates } : rec,
     );
     await saveRecordings(updatedRecordings);
   };
