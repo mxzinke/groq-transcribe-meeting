@@ -33,10 +33,10 @@ const MeetingHistory: React.FC = () => {
         <div className="text-center">
           <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">
-            Keine Aufnahmen vorhanden
+            No recordings found
           </h3>
           <p className="text-gray-600 dark:text-gray-400">
-            Starten Sie eine neue Aufnahme, um sie hier zu sehen.
+            Start a new recording to see it here.
           </p>
         </div>
       </div>
@@ -47,7 +47,7 @@ const MeetingHistory: React.FC = () => {
     <>
       <div className="p-8">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-          Meeting Verlauf
+          Meeting History
         </h2>
 
         <div className="grid gap-4">
@@ -59,13 +59,13 @@ const MeetingHistory: React.FC = () => {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                    {recording.metadata.title || 'Unbenanntes Meeting'}
+                    {recording.metadata.title || 'Untitled Meeting'}
                   </h3>
                   
                   <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
                     <div className="flex items-center gap-1">
                       <Calendar className="w-4 h-4" />
-                      {new Date(recording.date).toLocaleDateString('de-DE')}
+                      {new Date(recording.date).toLocaleDateString()}
                     </div>
                     <div className="flex items-center gap-1">
                       <Clock className="w-4 h-4" />
@@ -75,19 +75,19 @@ const MeetingHistory: React.FC = () => {
 
                   {recording.metadata.participants && (
                     <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                      Teilnehmer: {recording.metadata.participants}
+                      Participants: {recording.metadata.participants}
                     </p>
                   )}
 
                   <div className="flex gap-2 mt-4">
                     {recording.transcript && (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
-                        Transkribiert
+                        Transcribed
                       </span>
                     )}
                     {recording.summary && (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100">
-                        Zusammengefasst
+                        Summarized
                       </span>
                     )}
                   </div>
@@ -98,21 +98,21 @@ const MeetingHistory: React.FC = () => {
                     <button
                       onClick={() => setSelectedRecording(recording)}
                       className="p-2 text-gray-600 hover:text-primary dark:text-gray-400 dark:hover:text-primary rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                      title="Details anzeigen"
+                      title="Show details"
                     >
                       <Eye className="w-5 h-5" />
                     </button>
                   )}
                   <button
                     className="p-2 text-gray-600 hover:text-primary dark:text-gray-400 dark:hover:text-primary rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                    title="Herunterladen"
+                    title="Download"
                   >
                     <Download className="w-5 h-5" />
                   </button>
                   <button
                     onClick={() => handleDelete(recording.id)}
                     className="p-2 text-gray-600 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                    title="Löschen"
+                    title="Delete"
                   >
                     <Trash2 className="w-5 h-5" />
                   </button>

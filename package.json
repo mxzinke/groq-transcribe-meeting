@@ -16,8 +16,8 @@
   },
   "keywords": [],
   "author": {
-    "name": "Your Name",
-    "email": "you@example.com"
+    "name": "Maximilian Pfennig",
+    "email": "max@coin-mirror.org"
   },
   "license": "MIT",
   "devDependencies": {
@@ -30,13 +30,14 @@
     "@electron-forge/plugin-fuses": "^7.8.1",
     "@electron-forge/plugin-vite": "^7.8.1",
     "@electron/fuses": "^1.8.0",
-    "@testing-library/jest-dom": "^6.7.0",
+    "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
     "@types/react": "^18.3.14",
     "@types/react-dom": "^18.3.5",
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/ui": "^2.1.9",
     "autoprefixer": "^10.4.20",
     "electron": "^33.3.1",
     "eslint": "^8.57.1",
@@ -53,8 +54,9 @@
     "@ai-sdk/groq": "^1.2.9",
     "@tailwindcss/typography": "^0.5.16",
     "ai": "^4.0.45",
+    "electron-recorder": "^1.0.0",
     "electron-squirrel-startup": "^1.0.1",
-    "electron-store": "^10.0.0",
+    "electron-store": "^10.1.0",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

@@ -25,10 +25,10 @@ const SettingsView: React.FC = () => {
 
     try {
       await window.electronAPI.store.set('groqApiKey', groqApiKey);
-      setSaveMessage('API-Schlüssel erfolgreich gespeichert!');
+      setSaveMessage('API key successfully saved!');
       setTimeout(() => setSaveMessage(''), 3000);
     } catch (error) {
-      setSaveMessage('Fehler beim Speichern des API-Schlüssels.');
+      setSaveMessage('Error saving API key.');
     } finally {
       setIsSaving(false);
     }
@@ -37,14 +37,14 @@ const SettingsView: React.FC = () => {
   return (
     <div className="p-8 max-w-4xl mx-auto">
       <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-        Einstellungen
+        Settings
       </h2>
 
       <div className="space-y-6">
         {/* Theme Settings */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Erscheinungsbild
+            Appearance
           </h3>
           
           <div className="flex items-center justify-between">
@@ -53,7 +53,7 @@ const SettingsView: React.FC = () => {
                 Dark Mode
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Schaltet zwischen hellem und dunklem Design um
+                Switches between light and dark mode
               </p>
             </div>
             
@@ -81,13 +81,13 @@ const SettingsView: React.FC = () => {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
             <Key className="w-5 h-5" />
-            Groq API Konfiguration
+            Groq API Configuration
           </h3>
           
           <div className="space-y-4">
             <div>
               <label htmlFor="apiKey" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                API-Schlüssel
+                API-Key from Groq
               </label>
               <input
                 type="password"
@@ -98,7 +98,7 @@ const SettingsView: React.FC = () => {
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
               />
               <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                Erhalten Sie Ihren API-Schlüssel von{' '}
+                Get your API key from{' '}
                 <a 
                   href="https://console.groq.com/keys" 
                   target="_blank" 
@@ -117,7 +117,7 @@ const SettingsView: React.FC = () => {
                 className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
               >
                 <Save className="w-4 h-4 mr-2" />
-                {isSaving ? 'Speichern...' : 'Speichern'}
+                {isSaving ? 'Saving...' : 'Save'}
               </button>
 
               {saveMessage && (
@@ -135,12 +135,12 @@ const SettingsView: React.FC = () => {
             <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
             <div>
               <h4 className="font-medium text-blue-900 dark:text-blue-200">
-                Datenschutz-Hinweis
+                Privacy Notice
               </h4>
               <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
-                Diese App speichert alle Daten lokal auf Ihrem Computer. Nur die Audio-Dateien 
-                werden zur Transkription an Groq gesendet. Ihre Meeting-Inhalte werden nicht 
-                dauerhaft auf externen Servern gespeichert.
+                This app stores all data locally on your computer. Only the audio files 
+                are sent to Groq for transcription. Your meeting content is not stored 
+                permanently on external servers.
               </p>
             </div>
           </div>

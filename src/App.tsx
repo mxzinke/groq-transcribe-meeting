@@ -60,7 +60,7 @@ function App() {
                 }`}
               >
                 <Mic className="w-5 h-5" />
-                Aufnahme
+                Recording
               </button>
               
               <button
@@ -72,7 +72,7 @@ function App() {
                 }`}
               >
                 <Clock className="w-5 h-5" />
-                Verlauf
+                History
               </button>
               
               <button
@@ -84,7 +84,7 @@ function App() {
                 }`}
               >
                 <Settings className="w-5 h-5" />
-                Einstellungen
+                Settings
               </button>
             </nav>
           </div>

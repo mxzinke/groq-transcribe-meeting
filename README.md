@@ -1,4 +1,4 @@
-# Meeting Recorder App
+# Meeting Recorder App (via Groq API)
 
 A modern Electron-based desktop application for macOS that records, transcribes, and summarizes meetings using AI. Built with React, TypeScript, and Tailwind CSS, it provides a beautiful and intuitive interface for capturing and managing meeting content.
 
@@ -30,7 +30,7 @@ A modern Electron-based desktop application for macOS that records, transcribes,
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/meeting-recorder.git
+git clone https://github.com/mxzinke/groq-transcribe-meeting.git
 cd meeting-recorder
 ```
 
