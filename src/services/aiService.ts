@@ -26,7 +26,7 @@ class AIService {
     this.groq = createGroq({
       apiKey: apiKey,
     });
-    this.model = this.groq("mistral-saba-24b");
+    this.model = this.groq("moonshotai/kimi-k2-instruct");
   }
 
   async transcribeAudio(
@@ -57,7 +57,7 @@ class AIService {
       const formData = new FormData();
       formData.append("file", audioFile);
       formData.append("model", "whisper-large-v3");
-      formData.append("language", "de"); // German language
+      //formData.append("language", "de"); // German language
       formData.append("response_format", "json");
 
       const response = await fetch(
@@ -113,30 +113,36 @@ class AIService {
     try {
       const prompt = `You are a helpful assistant that summarizes meetings. You will be given a transcript of a meeting and you will need to summarize it. Here is how you should structure your response:
 
-1. Metadata
+## 1. Metadata
 - **Date**: ${metadata.date || new Date().toLocaleDateString("de-DE")}
 - **Duration**: ${metadata.duration || "Unknown"}
 - **Participants**: ${metadata.participants || "Unknown"}
 
-2. Main Topics
+## 2. Main Topics
 [Extract the main topics of the meeting. List them as bullet points.]
 
-3. Decisions
+## 3. Decisions
 [List all decisions made in the meeting as bullet points. If no explicit decisions were made, write "No explicit decisions documented".]
 
-4. Action Items
+## 4. Action Items
 [Concrete tasks and responsibilities formatted as markdown list. If none were mentioned, write "No concrete action items identified".]
 
-5. Next Steps
+## 5. Next Steps
 [Planned follow-up actions. If none were mentioned, write "No next steps defined".]
 
-6. Summary
+## 6. Summary
 [A concise, clear summary of the meeting in 2-3 sentences.]
 
----
 
-TRANSKRIPT:
-${transcript}`;
+<additional_context>
+${metadata.additionalContext}
+</additional_context>
+
+<transcript>
+${transcript}
+</transcript>
+
+Use the lanaguage of the users within the transcript and format in markdown document.`;
 
       const { text } = await generateText({
         model: this.model,

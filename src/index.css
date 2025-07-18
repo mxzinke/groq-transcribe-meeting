@@ -13,3 +13,58 @@ body {
 * {
   box-sizing: border-box;
 }
+
+@supports (scrollbar-color: auto) {
+  /* Hide scrollbar for IE, Edge and Firefox */
+  .scrollbar-hidden {
+    -ms-overflow-style: none;  /* IE and Edge */
+    -moz-overflow-style: none;
+    scrollbar-width: none;  /* Firefox */
+  }
+
+  .scrollbar-trans {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+    -ms-overflow-style: none;  /* IE and Edge */
+    transition: scrollbar-color 0.3s ease;
+  }
+
+  .scrollbar-trans:hover {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(113, 113, 113) transparent;
+    -ms-overflow-style: none;  /* IE and Edge */
+    transition: scrollbar-color 0.3s ease;
+  }
+}
+
+@supports selector(::-webkit-scrollbar) {
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  .scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Small and transparent scrollbar */
+  .scrollbar-trans::-webkit-scrollbar {
+    background-color: transparent;
+    width: 6px;
+    height: 6px;
+    -webkit-overflow-scrolling: auto !important;
+  }
+
+  .scrollbar-trans.scrollbar-trans::-webkit-scrollbar-track {
+    -webkit-border-radius: 4px;
+    border-radius: 4px;
+  }
+
+  .scrollbar-trans::-webkit-scrollbar-thumb {
+    -webkit-border-radius: 4px;
+    border-radius: 4px;
+    background: transparent; 
+    transition: background-color 0.3s ease;
+  }
+
+  .scrollbar-trans::-webkit-scrollbar-thumb:window-inactive {
+    background: rgb(113, 113, 113); 
+    transition: background-color 0.3s ease;
+  }
+}

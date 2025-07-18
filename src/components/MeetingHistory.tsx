@@ -1,11 +1,26 @@
-import React, { useEffect, useState } from 'react';
-import { FileText, Trash2, Download, Calendar, Clock, Eye } from 'lucide-react';
-import { useRecording } from '../contexts/RecordingContext';
-import MeetingDetail from './MeetingDetail';
+import React, { useEffect, useState } from "react";
+import {
+  FileText,
+  Trash2,
+  Download,
+  Calendar,
+  Clock,
+  Eye,
+  Edit2,
+  Check,
+  X,
+} from "lucide-react";
+import { useRecording } from "../contexts/RecordingContext";
+import MeetingDetail from "./MeetingDetail";
 
 const MeetingHistory: React.FC = () => {
-  const { recordings, deleteRecording, refreshRecordings } = useRecording();
-  const [selectedRecording, setSelectedRecording] = useState<any>(null);
+  const { recordings, deleteRecording, updateRecording, refreshRecordings } =
+    useRecording();
+  const [selectedRecordingId, setSelectedRecordingId] = useState<string | null>(
+    null,
+  );
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editedTitle, setEditedTitle] = useState("");
 
   useEffect(() => {
     refreshRecordings();
@@ -14,7 +29,7 @@ const MeetingHistory: React.FC = () => {
   const formatDuration = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    
+
     if (hours > 0) {
       return `${hours}h ${minutes}min`;
     }
@@ -22,8 +37,45 @@ const MeetingHistory: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Möchten Sie diese Aufnahme wirklich löschen?')) {
+    if (window.confirm("Are you sure you want to delete this recording?")) {
       await deleteRecording(id);
+    }
+  };
+
+  const handleStartEdit = (recording: any) => {
+    setEditingId(recording.id);
+    setEditedTitle(recording.metadata.title || "");
+  };
+
+  const handleSaveEdit = async (id: string) => {
+    const recording = recordings.find((r) => r.id === id);
+    if (recording && editedTitle.trim() !== recording.metadata.title) {
+      await updateRecording(id, {
+        metadata: {
+          ...recording.metadata,
+          title: editedTitle.trim() || "Untitled Meeting",
+        },
+      });
+    }
+    setEditingId(null);
+    setEditedTitle("");
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditedTitle("");
+  };
+
+  const handleDownloadAudio = async (recording: any) => {
+    try {
+      // In an Electron app, we would need to implement this through the main process
+      // For now, let's show a message that this feature would need backend implementation
+      alert(
+        "Audio download functionality would need to be implemented in the Electron main process to access the stored audio files.",
+      );
+    } catch (error) {
+      console.error("Failed to download audio:", error);
+      alert("Failed to download audio file.");
     }
   };
 
@@ -53,15 +105,54 @@ const MeetingHistory: React.FC = () => {
         <div className="grid gap-4">
           {recordings.map((recording) => (
             <div
-              key={recording.id}
+              key={`${recording.id}-${recording.metadata.title}`}
               className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                    {recording.metadata.title || 'Untitled Meeting'}
-                  </h3>
-                  
+                  {editingId === recording.id ? (
+                    <div className="flex items-center gap-2 mb-2">
+                      <input
+                        type="text"
+                        value={editedTitle}
+                        onChange={(e) => setEditedTitle(e.target.value)}
+                        className="flex-1 text-lg font-semibold bg-transparent border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleSaveEdit(recording.id);
+                          if (e.key === "Escape") handleCancelEdit();
+                        }}
+                      />
+                      <button
+                        onClick={() => handleSaveEdit(recording.id)}
+                        className="p-1 text-green-600 hover:text-green-700 rounded"
+                        title="Save"
+                      >
+                        <Check className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={handleCancelEdit}
+                        className="p-1 text-gray-600 hover:text-gray-700 rounded"
+                        title="Cancel"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 mb-2">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        {recording.metadata.title || "Untitled Meeting"}
+                      </h3>
+                      <button
+                        onClick={() => handleStartEdit(recording)}
+                        className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary"
+                        title="Edit title"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
                     <div className="flex items-center gap-1">
                       <Calendar className="w-4 h-4" />
@@ -96,19 +187,20 @@ const MeetingHistory: React.FC = () => {
                 <div className="flex gap-2 ml-4">
                   {(recording.transcript || recording.summary) && (
                     <button
-                      onClick={() => setSelectedRecording(recording)}
+                      onClick={() => setSelectedRecordingId(recording.id)}
                       className="p-2 text-gray-600 hover:text-primary dark:text-gray-400 dark:hover:text-primary rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                       title="Show details"
                     >
                       <Eye className="w-5 h-5" />
                     </button>
                   )}
-                  <button
+                  {/* <button
+                    onClick={() => handleDownloadAudio(recording)}
                     className="p-2 text-gray-600 hover:text-primary dark:text-gray-400 dark:hover:text-primary rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                     title="Download"
                   >
                     <Download className="w-5 h-5" />
-                  </button>
+                  </button> */}
                   <button
                     onClick={() => handleDelete(recording.id)}
                     className="p-2 text-gray-600 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
@@ -124,10 +216,10 @@ const MeetingHistory: React.FC = () => {
       </div>
 
       {/* Meeting Detail Modal */}
-      {selectedRecording && (
+      {selectedRecordingId && (
         <MeetingDetail
-          recording={selectedRecording}
-          onClose={() => setSelectedRecording(null)}
+          recording={recordings.find((r) => r.id === selectedRecordingId)!}
+          onClose={() => setSelectedRecordingId(null)}
         />
       )}
     </>

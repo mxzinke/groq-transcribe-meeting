@@ -8,6 +8,7 @@ import {
 } from "electron";
 import path from "path";
 import Store from "electron-store";
+import { initMain } from "electron-audio-loopback";
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require("electron-squirrel-startup")) {
@@ -68,8 +69,7 @@ const requestAudioPermissions = async () => {
         dialog.showMessageBox({
           type: "warning",
           title: "Microphone access required",
-          message:
-            "This app requires microphone access to record meetings.",
+          message: "This app requires microphone access to record meetings.",
           buttons: ["OK"],
         });
       }
@@ -83,6 +83,9 @@ const requestAudioPermissions = async () => {
 app.on("ready", () => {
   createWindow();
   requestAudioPermissions();
+
+  // Initialize audio loopback plugin
+  initMain();
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common
@@ -121,50 +124,4 @@ ipcMain.handle("store-delete", (_, key: string) => {
   return true;
 });
 
-// Audio source enumeration for system audio capture
-ipcMain.handle("get-audio-sources", async () => {
-  try {
-    const sources = await desktopCapturer.getSources({
-      types: ["window", "screen"],
-    });
 
-    return sources.map((source) => ({
-      id: source.id,
-      name: source.name,
-      thumbnail: source.thumbnail.toDataURL(),
-      display_id: source.display_id,
-      appIcon: source.appIcon ? source.appIcon.toDataURL() : null,
-    }));
-  } catch (error) {
-    console.error("Failed to get audio sources:", error);
-    return [];
-  }
-});
-
-// Request screen capture permissions on macOS
-ipcMain.handle("request-screen-capture-permission", async () => {
-  if (process.platform === "darwin") {
-    try {
-      const sources = await desktopCapturer.getSources({
-        types: ["screen"],
-      });
-      return sources.length > 0;
-    } catch (error) {
-      console.error("Screen capture permission denied:", error);
-      return false;
-    }
-  }
-  return true; // Windows/Linux don't need explicit permission request
-});
-
-// Get available audio devices
-ipcMain.handle("get-audio-devices", async () => {
-  try {
-    // This would be handled on the renderer side using navigator.mediaDevices.enumerateDevices()
-    // We're just providing a bridge for future expansion
-    return { success: true };
-  } catch (error) {
-    console.error("Failed to get audio devices:", error);
-    return { success: false, error: (error as Error).message };
-  }
-});

@@ -54,11 +54,14 @@
     "@ai-sdk/groq": "^1.2.9",
     "@tailwindcss/typography": "^0.5.16",
     "ai": "^4.0.45",
+    "electron-audio-loopback": "^1.0.5",
     "electron-recorder": "^1.0.0",
     "electron-squirrel-startup": "^1.0.1",
     "electron-store": "^10.1.0",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
   }
 }

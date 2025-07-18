@@ -15,12 +15,8 @@ declare global {
         set: (key: string, value: any) => Promise<void>;
         delete: (key: string) => Promise<void>;
       };
-      audio: {
-        requestPermission: () => Promise<void>;
-        getSources: () => Promise<AudioSource[]>;
-        requestScreenCapturePermission: () => Promise<boolean>;
-        getDevices: () => Promise<{ success: boolean; error?: string }>;
-      };
+      enableLoopbackAudio: () => Promise<void>;
+      disableLoopbackAudio: () => Promise<void>;
     };
     webkitAudioContext: typeof AudioContext;
   }

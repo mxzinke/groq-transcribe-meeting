@@ -10,11 +10,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("store-set", key, value),
     delete: (key: string) => ipcRenderer.invoke("store-delete", key),
   },
-  audio: {
-    requestPermission: () => ipcRenderer.invoke("request-audio-permission"),
-    getSources: () => ipcRenderer.invoke("get-audio-sources"),
-    requestScreenCapturePermission: () =>
-      ipcRenderer.invoke("request-screen-capture-permission"),
-    getDevices: () => ipcRenderer.invoke("get-audio-devices"),
-  },
+  enableLoopbackAudio: () => ipcRenderer.invoke('enable-loopback-audio'),
+  disableLoopbackAudio: () => ipcRenderer.invoke('disable-loopback-audio')
 });
+
+
